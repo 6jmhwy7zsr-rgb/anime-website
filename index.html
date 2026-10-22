@@ -1,19 +1,384 @@
-Build a single-page anime streaming/discovery website as one self-contained HTML file (HTML, CSS, vanilla JS only, no frameworks).
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEONKAI | Anime Streaming</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ---------- Design tokens ---------- */
+:root{
+  --bg:#070814; --bg2:#0e1030; --pink:#ff2e93; --cyan:#19e3ff; --violet:#8a4dff;
+  --text:#eef0ff; --muted:#a3a7d1;
+  --display:'Orbitron','Segoe UI',sans-serif; --body:'Inter','Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--body);line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+h1,h2,h3{font-family:var(--display);line-height:1.1}
+section{padding:90px 6vw;position:relative}
+.section-title{font-size:clamp(1.6rem,4vw,2.6rem);margin-bottom:28px;
+  background:linear-gradient(90deg,var(--cyan),var(--pink),var(--violet),var(--cyan));
+  background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:flow 6s linear infinite}
+@keyframes flow{to{background-position:300% 0}}
 
-Style: dark, neon-cyberpunk look with a deep navy/black background and electric pink, cyan, and violet accents. Bold display font for headings (e.g. Orbitron or Bebas Neue) and a clean sans-serif for body text.
+/* ---------- Loader ---------- */
+#loader{position:fixed;inset:0;background:var(--bg);z-index:100;display:grid;place-items:center;
+  transition:opacity .6s,visibility .6s}
+#loader.done{opacity:0;visibility:hidden}
+.loader-box{text-align:center}
+.loader-logo{font-family:var(--display);font-weight:900;font-size:2rem;letter-spacing:.3em;color:var(--cyan);
+  text-shadow:0 0 18px var(--cyan)}
+.bar{width:220px;height:4px;background:#1b1e48;margin:18px auto 0;border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--pink),var(--cyan));
+  animation:load 1.6s ease-out forwards}
+@keyframes load{to{width:100%}}
 
-Sections:
-1. Hero: full-screen with a parallax layered background (CSS shapes or gradients standing in for city skyline, moon, and clouds), a glitch-effect title, and a glowing "Start Watching" button with a pulse animation.
-2. Trending carousel: horizontally scrolling anime cards with 3D tilt on hover, a glowing border, and a rating badge. Use gradient placeholders instead of images.
-3. Genre bar: pill buttons that morph and glow on hover, and filter the cards with a smooth fade/slide transition.
-4. Featured anime spotlight: split layout with a typewriter-style synopsis and an animated stats bar (score, episodes, year) that counts up on scroll.
-5. Footer: minimal, with animated social icons.
+/* ---------- Cursor & particles ---------- */
+#petals{position:fixed;inset:0;pointer-events:none;z-index:1}
+.cursor,.cursor-dot{position:fixed;top:0;left:0;pointer-events:none;z-index:99;border-radius:50%;
+  transform:translate(-50%,-50%);will-change:transform}
+.cursor{width:38px;height:38px;border:2px solid var(--cyan);box-shadow:0 0 18px var(--cyan),inset 0 0 12px var(--pink);opacity:.8}
+.cursor-dot{width:7px;height:7px;background:var(--pink);box-shadow:0 0 10px var(--pink)}
+@media (pointer:fine){body.has-cursor,body.has-cursor a,body.has-cursor button{cursor:none}}
+@media (pointer:coarse){.cursor,.cursor-dot{display:none}}
 
-Animations:
-- Scroll-triggered reveals (fade, slide, scale) using IntersectionObserver
-- Custom cursor with a trailing glow and floating sakura petals or particles in the background
-- Animated gradient text and subtle screen-shake on the hero title
-- Smooth page-load intro with a stylized loading screen
-- Respect prefers-reduced-motion
+/* ---------- Nav ---------- */
+nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;justify-content:space-between;align-items:center;
+  padding:16px 6vw;background:linear-gradient(var(--bg),transparent)}
+.logo{font-family:var(--display);font-weight:900;letter-spacing:.2em;color:var(--cyan);text-shadow:0 0 12px var(--cyan)}
+nav ul{display:flex;gap:26px;list-style:none;font-size:.9rem}
+nav ul a{color:var(--muted);transition:color .2s}
+nav ul a:hover{color:var(--pink)}
+@media (max-width:600px){nav ul{display:none}}
 
-Requirements: fully responsive (mobile-first), accessible contrast and focus states, 60fps animations (use transform/opacity), clean commented code.
+/* ---------- Hero ---------- */
+.hero{height:100vh;min-height:620px;padding:0;display:grid;place-items:center;text-align:center;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 100%,#3a0f5e 0%,var(--bg) 65%)}
+.layer{position:absolute;inset:-5%;will-change:transform;transition:transform .15s linear}
+.moon{position:absolute;top:14%;left:50%;width:min(34vw,260px);aspect-ratio:1;margin-left:calc(min(34vw,260px)/-2);
+  border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe3f3,var(--pink) 60%,#7a1ba8);
+  box-shadow:0 0 90px 20px rgba(255,46,147,.5)}
+.skyline{position:absolute;bottom:0;left:0;width:100%;height:42%}
+.skyline.back{opacity:.55;filter:drop-shadow(0 0 10px var(--violet))}
+.skyline.front{filter:drop-shadow(0 0 8px var(--cyan))}
+.cloud{position:absolute;height:26px;border-radius:30px;background:linear-gradient(90deg,transparent,rgba(138,77,255,.35),transparent);
+  animation:drift linear infinite}
+@keyframes drift{from{transform:translateX(-30vw)}to{transform:translateX(130vw)}}
+.hero-content{position:relative;z-index:5;padding:0 6vw}
+.hero h1{font-size:clamp(2.6rem,11vw,7.5rem);font-weight:900;letter-spacing:.06em;position:relative;
+  animation:shake 5s infinite}
+.glitch{position:relative;display:inline-block}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;inset:0;overflow:hidden}
+.glitch::before{color:var(--cyan);animation:g1 2.4s infinite steps(1);clip-path:inset(0 0 55% 0)}
+.glitch::after{color:var(--pink);animation:g2 2.4s infinite steps(1);clip-path:inset(55% 0 0 0)}
+@keyframes g1{0%,88%,100%{transform:translate(0)}90%{transform:translate(-5px,2px)}94%{transform:translate(4px,-2px)}}
+@keyframes g2{0%,84%,100%{transform:translate(0)}86%{transform:translate(5px,-2px)}92%{transform:translate(-4px,2px)}}
+@keyframes shake{0%,90%,100%{transform:translate(0)}91%{transform:translate(-3px,2px)}93%{transform:translate(3px,-2px)}95%{transform:translate(-2px,-1px)}97%{transform:translate(2px,1px)}}
+.hero p{color:var(--muted);max-width:520px;margin:18px auto 34px;font-size:1.05rem}
+.btn{display:inline-block;font-family:var(--display);font-weight:800;letter-spacing:.12em;padding:16px 38px;border:0;
+  border-radius:50px;color:#fff;background:linear-gradient(90deg,var(--pink),var(--violet));
+  box-shadow:0 0 22px rgba(255,46,147,.7);animation:pulse 2s infinite;transition:transform .2s}
+.btn:hover{transform:scale(1.07)}
+@keyframes pulse{50%{box-shadow:0 0 44px 8px rgba(255,46,147,.85)}}
+
+/* ---------- Reveal ---------- */
+.reveal{opacity:0;transform:translateY(40px) scale(.97);transition:opacity .8s,transform .8s}
+.reveal.in{opacity:1;transform:none}
+
+/* ---------- Genres ---------- */
+.genres{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:34px;position:relative;z-index:2}
+.pill{font:600 .9rem var(--body);color:var(--text);background:transparent;border:2px solid var(--violet);
+  padding:10px 24px;border-radius:50px;transition:all .3s cubic-bezier(.3,1.8,.5,1)}
+.pill:hover{border-radius:12px;transform:translateY(-3px) rotate(-2deg);box-shadow:0 0 18px var(--violet)}
+.pill.active{background:linear-gradient(90deg,var(--cyan),var(--violet));border-color:transparent;color:#05060f;
+  box-shadow:0 0 20px var(--cyan)}
+
+/* ---------- Carousel ---------- */
+.rail-wrap{position:relative;z-index:2}
+.rail{display:flex;gap:26px;overflow-x:auto;scroll-snap-type:x mandatory;padding:20px 6px 34px;perspective:1000px;
+  scrollbar-width:thin;scrollbar-color:var(--violet) transparent}
+.card{flex:0 0 230px;height:340px;scroll-snap-align:start;border-radius:18px;position:relative;overflow:hidden;
+  background:var(--g);border:2px solid transparent;transition:transform .15s,opacity .3s,border-color .3s,box-shadow .3s;
+  transform-style:preserve-3d;will-change:transform;display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
+.card:hover{border-color:var(--cyan);box-shadow:0 0 28px var(--cyan),0 0 60px rgba(255,46,147,.3)}
+.card::before{content:"";position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(5,6,15,.92));z-index:0}
+.card::after{content:"";position:absolute;width:140%;height:140%;top:-20%;left:-20%;opacity:.25;
+  background:repeating-linear-gradient(115deg,#fff 0 2px,transparent 2px 18px)}
+.card>*{position:relative;z-index:2;transform:translateZ(30px)}
+.card h3{font-size:1.1rem;margin-bottom:4px}
+.card small{color:var(--muted)}
+.badge{position:absolute!important;top:14px;right:14px;background:#05060fcc;color:var(--cyan);font:800 .85rem var(--display);
+  padding:6px 12px;border-radius:30px;border:1px solid var(--cyan);box-shadow:0 0 10px var(--cyan)}
+.card.out{opacity:0;transform:translateY(24px) scale(.9)}
+.card.hide{display:none}
+.arrow{position:absolute;top:45%;width:46px;height:46px;border-radius:50%;border:2px solid var(--cyan);background:#070814dd;
+  color:var(--cyan);font-size:1.3rem;z-index:5;transition:all .2s}
+.arrow:hover{background:var(--cyan);color:var(--bg);box-shadow:0 0 20px var(--cyan)}
+.arrow.l{left:-14px}.arrow.r{right:-14px}
+@media (max-width:600px){.arrow{display:none}}
+
+/* ---------- Spotlight ---------- */
+.spot{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center;background:linear-gradient(180deg,var(--bg),var(--bg2))}
+.poster{aspect-ratio:3/4;max-width:380px;width:100%;justify-self:center;border-radius:22px;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,#ff2e93,#8a4dff 55%,#19e3ff);box-shadow:0 0 60px rgba(138,77,255,.6);animation:float 5s ease-in-out infinite}
+.poster::after{content:"星";position:absolute;inset:0;display:grid;place-items:center;font-size:9rem;color:#ffffff55;
+  font-family:serif}
+@keyframes float{50%{transform:translateY(-14px) rotate(1deg)}}
+.spot h2{font-size:clamp(1.8rem,4vw,3rem);margin-bottom:16px}
+.type{min-height:7.5em;color:var(--muted);font-size:1.05rem;max-width:56ch}
+.type::after{content:"|";color:var(--pink);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.stats{display:flex;gap:30px;margin-top:28px;flex-wrap:wrap}
+.stat b{display:block;font:900 2.4rem var(--display);color:var(--cyan);text-shadow:0 0 14px var(--cyan)}
+.stat span{color:var(--muted);font-size:.85rem}
+@media (max-width:800px){.spot{grid-template-columns:1fr}}
+
+/* ---------- Footer ---------- */
+footer{padding:60px 6vw 40px;text-align:center;border-top:1px solid #23265a;background:var(--bg)}
+.socials{display:flex;justify-content:center;gap:18px;margin-bottom:22px}
+.socials a{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--violet);
+  transition:transform .3s cubic-bezier(.3,1.8,.5,1),box-shadow .3s,border-color .3s}
+.socials a:hover{transform:translateY(-8px) rotate(12deg) scale(1.15);border-color:var(--pink);box-shadow:0 0 22px var(--pink)}
+.socials svg{width:22px;height:22px;fill:var(--text)}
+footer p{color:var(--muted);font-size:.85rem}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .reveal{opacity:1;transform:none}
+  #petals{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="loader" aria-hidden="true">
+  <div class="loader-box"><div class="loader-logo">NEONKAI</div><div class="bar"><i></i></div></div>
+</div>
+
+<canvas id="petals" aria-hidden="true"></canvas>
+<div class="cursor" id="cur"></div><div class="cursor-dot" id="dot"></div>
+
+<nav>
+  <a href="#top" class="logo">NEONKAI</a>
+  <ul><li><a href="#trending">Trending</a></li><li><a href="#spotlight">Spotlight</a></li><li><a href="#footer">Connect</a></li></ul>
+</nav>
+
+<header class="hero" id="top">
+  <div class="layer" data-speed="8"><div class="moon"></div>
+    <div class="cloud" style="top:30%;width:240px;animation-duration:38s"></div>
+    <div class="cloud" style="top:44%;width:340px;animation-duration:52s;animation-delay:-20s"></div>
+    <div class="cloud" style="top:22%;width:180px;animation-duration:44s;animation-delay:-8s"></div>
+  </div>
+  <svg class="layer skyline back" data-speed="16" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#1a0f45" d="M0 300V170h60v-40h50v70h60V110h70v90h50V150h80v-60h60v120h70V130h60v70h80V100h60v110h70V160h60v-50h70v130h60V140h60v160z"/>
+  </svg>
+  <svg class="layer skyline front" data-speed="28" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#0a0820" stroke="#19e3ff" stroke-width="2" d="M0 300V210h80v-70h40v-30h30v30h40v90h70V160h60v-80h30v-30h30v30h30v100h80v-60h70v70h60V120h50v-40h40v40h50v130h70V170h80v-90h30v-30h30v30h30v120h60v-60h70v110z"/>
+  </svg>
+  <div class="hero-content">
+    <h1><span class="glitch" data-text="NEONKAI">NEONKAI</span></h1>
+    <p>Stream the newest and boldest anime in a city that never sleeps.</p>
+    <a href="#trending" class="btn">START WATCHING</a>
+  </div>
+</header>
+
+<section id="trending">
+  <h2 class="section-title reveal">Trending now</h2>
+  <div class="genres reveal" role="group" aria-label="Filter by genre">
+    <button class="pill active" data-g="all">All</button>
+    <button class="pill" data-g="action">Action</button>
+    <button class="pill" data-g="scifi">Sci-Fi</button>
+    <button class="pill" data-g="fantasy">Fantasy</button>
+    <button class="pill" data-g="romance">Romance</button>
+  </div>
+  <div class="rail-wrap reveal">
+    <button class="arrow l" aria-label="Scroll left">&#8249;</button>
+    <div class="rail" id="rail"></div>
+    <button class="arrow r" aria-label="Scroll right">&#8250;</button>
+  </div>
+</section>
+
+<section id="spotlight" class="spot">
+  <div class="poster reveal" role="img" aria-label="Featured anime poster"></div>
+  <div class="reveal">
+    <h2 class="section-title">Crimson Circuit</h2>
+    <p class="type" id="type" aria-live="polite"></p>
+    <div class="stats">
+      <div class="stat"><b data-to="9.4" data-dec="1">0</b><span>Score</span></div>
+      <div class="stat"><b data-to="24">0</b><span>Episodes</span></div>
+      <div class="stat"><b data-to="2026" data-fmt="year">0</b><span>Year</span></div>
+    </div>
+  </div>
+</section>
+
+<footer id="footer">
+  <div class="socials">
+    <a href="#" aria-label="Video channel"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></a>
+    <a href="#" aria-label="Community chat"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H8l-4 4z"/></svg></a>
+    <a href="#" aria-label="Favorites"><svg viewBox="0 0 24 24"><path d="M12 21l-1.5-1.3C5.4 15.1 2 12 2 8.5A5.5 5.5 0 0 1 7.5 3c1.7 0 3.4.8 4.5 2.1A6 6 0 0 1 16.5 3 5.5 5.5 0 0 1 22 8.5c0 3.5-3.400 6.600-8.500 11.200z"/></svg></a>
+    <a href="#" aria-label="Updates"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.9L22 10l-5.500 4.800L18 22l-6-3.700L6 22l1.500-7.200L2 10l7.100-1.100z"/></svg></a>
+  </div>
+  <p>&copy; 2026 NEONKAI. Demo site with original placeholder titles.</p>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ----- Loader ----- */
+  window.addEventListener('load', function(){
+    setTimeout(function(){ document.getElementById('loader').classList.add('done'); }, reduce ? 0 : 1700);
+  });
+
+  /* ----- Card data (original placeholder titles) ----- */
+  var shows = [
+    {t:'Naruto',g:'action',r:9.3,s:'Ninja adventure',c:['#ff8a00','#1d4fff']},
+    {t:'One Piece',g:'fantasy',r:9.5,s:'Pirate adventure',c:['#ff2e43','#19e3ff']},
+    {t:'Dragon Ball',g:'action',r:9.2,s:'Martial arts saga',c:['#ffd400','#ff5a00']},
+    {t:'Crimson Circuit',g:'scifi',r:9.4,s:'Cyber noir',c:['#ff2e93','#8a4dff']},
+    {t:'Blade of Dawn',g:'action',r:9.1,s:'Swordplay',c:['#ff7a18','#ff2e93']},
+    {t:'Moonlit Letters',g:'romance',r:8.8,s:'Slice of life',c:['#ff9ad5','#6c5cff']},
+    {t:'Skyforge Academy',g:'fantasy',r:8.9,s:'Magic school',c:['#19e3ff','#8a4dff']},
+    {t:'Orbit Ronin',g:'scifi',r:9.0,s:'Space western',c:['#19e3ff','#0b3dff']},
+    {t:'Ember Court',g:'fantasy',r:8.6,s:'Dark fantasy',c:['#ff3d3d','#3d0b5c']},
+    {t:'Rooftop Heartbeat',g:'romance',r:8.5,s:'School drama',c:['#ffb199','#ff0844']},
+    {t:'Thunder Ward',g:'action',r:9.2,s:'Hero battles',c:['#f9f047','#ff2e93']}
+  ];
+  var rail = document.getElementById('rail');
+  shows.forEach(function(s){
+    var a = document.createElement('article');
+    a.className = 'card'; a.tabIndex = 0; a.dataset.g = s.g;
+    a.style.setProperty('--g','linear-gradient(155deg,'+s.c[0]+','+s.c[1]+')');
+    a.innerHTML = '<span class="badge">&#9733; '+s.r+'</span><h3>'+s.t+'</h3><small>'+s.s+'</small>';
+    rail.appendChild(a);
+  });
+
+  /* ----- 3D tilt ----- */
+  if(!reduce){
+    rail.addEventListener('pointermove', function(e){
+      var c = e.target.closest('.card'); if(!c) return;
+      var b = c.getBoundingClientRect(), x = (e.clientX-b.left)/b.width-.5, y = (e.clientY-b.top)/b.height-.5;
+      c.style.transform = 'rotateY('+(x*22)+'deg) rotateX('+(-y*22)+'deg) scale(1.05)';
+    });
+    rail.addEventListener('pointerout', function(e){
+      var c = e.target.closest('.card'); if(c) c.style.transform = '';
+    });
+  }
+
+  /* ----- Genre filter ----- */
+  var pills = document.querySelectorAll('.pill'), cards = rail.querySelectorAll('.card');
+  pills.forEach(function(p){
+    p.addEventListener('click', function(){
+      pills.forEach(function(x){ x.classList.remove('active'); });
+      p.classList.add('active');
+      var g = p.dataset.g;
+      cards.forEach(function(c){ c.classList.add('out'); });
+      setTimeout(function(){
+        cards.forEach(function(c){
+          c.classList.toggle('hide', g !== 'all' && c.dataset.g !== g);
+        });
+        rail.scrollTo({left:0});
+        requestAnimationFrame(function(){ cards.forEach(function(c){ c.classList.remove('out'); }); });
+      }, reduce ? 0 : 280);
+    });
+  });
+
+  /* ----- Carousel arrows ----- */
+  document.querySelector('.arrow.l').onclick = function(){ rail.scrollBy({left:-300,behavior:'smooth'}); };
+  document.querySelector('.arrow.r').onclick = function(){ rail.scrollBy({left:300,behavior:'smooth'}); };
+
+  /* ----- Scroll reveals ----- */
+  var io = new IntersectionObserver(function(en){
+    en.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  },{threshold:.15});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  /* ----- Typewriter + count-up on spotlight ----- */
+  var text = 'In a rain-soaked megacity, a courier discovers a glowing circuit etched into her arm. It links her to a hidden network of rogue machines, and every episode pulls her deeper into a war between neon gangs and the AI that built the skyline.';
+  var typeEl = document.getElementById('type'), started = false;
+  function typeIt(){
+    if(reduce){ typeEl.textContent = text; return; }
+    var i = 0;
+    (function tick(){ typeEl.textContent = text.slice(0, ++i); if(i < text.length) setTimeout(tick, 22); })();
+  }
+  function countUp(el){
+    var to = parseFloat(el.dataset.to), dec = +el.dataset.dec || 0, dur = 1600, t0 = performance.now();
+    if(reduce){ el.textContent = to.toFixed(dec); return; }
+    (function step(now){
+      var p = Math.min((now-t0)/dur, 1), v = to*(1-Math.pow(1-p,3));
+      el.textContent = el.dataset.fmt === 'year' ? Math.round(v) : v.toFixed(dec);
+      if(p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  new IntersectionObserver(function(en, ob){
+    if(en[0].isIntersecting && !started){
+      started = true; typeIt();
+      document.querySelectorAll('.stat b').forEach(countUp);
+      ob.disconnect();
+    }
+  },{threshold:.35}).observe(document.getElementById('spotlight'));
+
+  if(reduce) return;
+
+  /* ----- Hero parallax (mouse + scroll) ----- */
+  var layers = document.querySelectorAll('.layer'), mx = 0, my = 0;
+  window.addEventListener('pointermove', function(e){
+    mx = e.clientX/innerWidth-.5; my = e.clientY/innerHeight-.5;
+    layers.forEach(function(l){
+      var s = +l.dataset.speed;
+      l.style.transform = 'translate3d('+(-mx*s)+'px,'+(-my*s*.6+scrollY*s*.01)+'px,0)';
+    });
+  });
+  window.addEventListener('scroll', function(){
+    layers.forEach(function(l){
+      var s = +l.dataset.speed;
+      l.style.transform = 'translate3d('+(-mx*s)+'px,'+(-my*s*.6+scrollY*s*.04)+'px,0)';
+    });
+  },{passive:true});
+
+  /* ----- Custom cursor with trailing glow ----- */
+  if(window.matchMedia('(pointer:fine)').matches){
+    document.body.classList.add('has-cursor');
+    var cur = document.getElementById('cur'), dot = document.getElementById('dot'), cx = 0, cy = 0, px = 0, py = 0;
+    window.addEventListener('pointermove', function(e){ px = e.clientX; py = e.clientY;
+      dot.style.transform = 'translate('+px+'px,'+py+'px) translate(-50%,-50%)'; });
+    (function loop(){
+      cx += (px-cx)*.15; cy += (py-cy)*.15;
+      cur.style.transform = 'translate('+cx+'px,'+cy+'px) translate(-50%,-50%)';
+      requestAnimationFrame(loop);
+    })();
+  }
+
+  /* ----- Sakura petals ----- */
+  var cv = document.getElementById('petals'), ctx = cv.getContext('2d'), W, H, petals = [];
+  function size(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+  size(); addEventListener('resize', size);
+  var count = innerWidth < 600 ? 22 : 45;
+  for(var i = 0; i < count; i++){
+    petals.push({x:Math.random()*W, y:Math.random()*H, r:4+Math.random()*7, vy:.4+Math.random()*1,
+      vx:-.3+Math.random()*.6, rot:Math.random()*6, vr:(Math.random()-.5)*.04, sw:Math.random()*6,
+      col:Math.random() < .7 ? 'rgba(255,154,213,.75)' : 'rgba(25,227,255,.55)'});
+  }
+  (function draw(){
+    ctx.clearRect(0,0,W,H);
+    petals.forEach(function(p){
+      p.y += p.vy; p.sw += .02; p.x += p.vx + Math.sin(p.sw)*.6; p.rot += p.vr;
+      if(p.y > H+20){ p.y = -20; p.x = Math.random()*W; }
+      if(p.x > W+20) p.x = -20; if(p.x < -20) p.x = W+20;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.ellipse(0,0,p.r,p.r*.55,0,0,6.283); ctx.fill(); ctx.restore();
+    });
+    requestAnimationFrame(draw);
+  })();
+})();
+</script>
+</body>
+</html>
